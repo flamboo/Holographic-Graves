@@ -1,19 +1,39 @@
-package me.flamboo.graves;
+package me.flamboo.gravestest;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.logging.Logger;
+
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.SkullType;
 import org.bukkit.Sound;
-import org.bukkit.entity.EntityType;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.Skull;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.plugin.PluginDescriptionFile;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -22,44 +42,463 @@ import org.bukkit.scheduler.BukkitRunnable;
 import com.gmail.filoghost.holograms.api.FloatingItem;
 import com.gmail.filoghost.holograms.api.Hologram;
 import com.gmail.filoghost.holograms.api.HolographicDisplaysAPI;
-import com.gmail.filoghost.holograms.api.PickupHandler;
+//import me.flamboo.gravescmd.GravesCookies;
 
-public class Graves extends JavaPlugin implements Listener{
+public class Graves extends JavaPlugin
+implements Listener
+{
 	
-	public void onEnable(){
-		
-		if (!Bukkit.getPluginManager().isPluginEnabled("HolographicDisplays")) {
-			getLogger().severe("*** HolographicDisplays is not installed or not enabled. ***");
-			getLogger().severe("*** This plugin will be disabled. ***");
-			this.setEnabled(false);
-			return;
-		}
-		
-		Bukkit.getServer().getPluginManager().registerEvents(this, this);
-		
+	private Inventory inv;
 	
-	
-	
-	for (Hologram hologram : HolographicDisplaysAPI.getHolograms(this));
-		}
+private static final int List = 0;
+public final Logger logger = Logger.getLogger("Minecraft");
+private HashMap<Player, ItemStack[]> inventory = new HashMap();
+private HashMap<Player, ItemStack[]> armor = new HashMap();
+private HashMap<Player, Integer> xp = new HashMap();
+private HashMap<Player, List<ItemStack>> drops = new HashMap();
+private boolean oneRecovery;
+private String success;
+private String fail;
+private boolean drop;
+private boolean saveEmpty;
+FileConfiguration config;
 
-	
-	@EventHandler
-    public void onPlayerDeath(PlayerDeathEvent e){
-		Location loc = e.getEntity().getLocation().add(0.0, 2.0, 0.0);
-		ItemStack itemStack = new ItemStack(Material.NETHER_STAR);
-		final FloatingItem floatingItem = HolographicDisplaysAPI.createFloatingItem(this, loc, itemStack);
-        final Hologram h = HolographicDisplaysAPI.createHologram(this,
-                e.getEntity().getLocation().add(0, 5, 0),
-                ChatColor.AQUA + e.getEntity().getDisplayName(),
-                ChatColor.AQUA + "Was Killed Here");
-        
-        new BukkitRunnable(){ //The runnable is within the event
-            @Override
-            public void run(){
-            	floatingItem.delete();
-            	h.delete();//delete the hologram
-            }
-        }.runTaskLater(this, 600*20);//the delay is 300(5min) * 20ticks.
+public void onEnable()
+{
+
+  PluginManager pm = getServer().getPluginManager();
+  pm.registerEvents(this, this);
+  
+  FileConfiguration config = getConfig();
+  
+  config.addDefault("Physical-Grave.Enable", true);
+  config.addDefault("Physical-Grave.Item", "JACK_O_LANTERN");
+  config.addDefault("Physical-Grave.Sounds.Create", "AMBIENCE_THUNDER");
+  config.addDefault("Physical-Grave.Sounds.Clicked", "LEVEL_UP");
+  config.addDefault("Graves.SaveInv", false);
+  config.addDefault("Graves.Known-Player.Stats", true);
+  List<String> Grave = Arrays.asList("Grave");
+  this.getConfig().set("Graves.Known-Player.Message", 1);
+  config.addDefault("Graves.Known-Player.Killer", false);
+  config.addDefault("Graves.Known-Player.LifeSpan", 1500);
+  config.addDefault("Graves.Known-Player.Item", "CHEST");
+  config.addDefault("Graves.Unknown-Player.Use", true);
+  config.addDefault("Graves.Unknown-Player.LifeSpan", 1500);
+  config.addDefault("Graves.Unknown-Player.Item", "ROTTEN_FLESH");
+  config.addDefault("Permission.Reload", "Graves.GR");
+  config.addDefault("Permission.Graves", "Graves.Use");   
+  config.addDefault("Permission.Config", "Graves.GC");
+
+  config.options().copyDefaults(true);
+  saveConfig();
+
+  for (Hologram localHologram : HolographicDisplaysAPI.getHolograms(this)); 
+  }
+/*
+public void openGUI(Player p){
+	    inv = Bukkit.createInventory(null, 9, "Vote Links"); //format: null, size of inventory (must be divisible by 9), "GUI name"
+	    inv.updateInventory();
+	    p.openInventory(inv);
+	}
+
+public void show(Player p) {
+		p.openInventory(inv);
+	}
+*/
+public boolean onCommand(CommandSender sender, Command cmd, String commandLable, String[] args) { 
+	  Player player = (Player)sender;
+	  PluginDescriptionFile pdffile = this.getDescription();
+    if (commandLable.equalsIgnoreCase("Grave")) {
+  	  
+  	  if(args.length > 0)
+  	  {
+  		  if(args[0].equalsIgnoreCase("Secret"))
+      	  	{
+  			  player.sendMessage(ChatColor.AQUA + "Shhh!!!!");
+				player.getInventory().addItem(new ItemStack(357,1,(byte)0));
+      	  	}
+  		  else if(args[0].equalsIgnoreCase("Info"))
+    	  	{
+    	  		// typed /Grave Config
+  			  player.sendMessage(ChatColor.BLUE + "[Holographic Graves]" + ChatColor.AQUA + "Holographic Graves Is a Plugin Made By");   
+			  player.sendMessage(ChatColor.BLUE + "Flamboo " + ChatColor.AQUA + "You Are Running Version " + pdffile.getVersion());
+			  player.sendMessage(ChatColor.GREEN + "Shout Out To " + ChatColor.GREEN + "" + ChatColor.BOLD + "Sinuce " + ChatColor.GREEN + "and " + ChatColor.GREEN + "" + ChatColor.BOLD +  "Clare " + ChatColor.GREEN + "over at denmarkinminecraft");
+    	  	}
+  		  else if(args[0].equalsIgnoreCase("reload"))
+  	  	{
+  	  				if (player.hasPermission(getConfig().getString("Permission.Reload"))) {
+  	  			        reloadConfig();
+  	  			        player.sendMessage(ChatColor.AQUA + "Reloading Config......");
+  	  			        player.sendMessage(ChatColor.AQUA + "Config Reloaded");
+  	  			      }
+  	  			      else
+  	  			      {
+  	  			        player.sendMessage(ChatColor.DARK_RED + "You Are Not allowed to that Silly");
+  	  			      }
+  	  			    } 	 
+  	  }
+  	  			
+
+
     }
+	return true;
 }
+
+public void saveStack(Player p, String where, YamlConfiguration yaml)
+{
+  List stack = new ArrayList();
+  for (ItemStack i : p.getInventory().getContents()) {
+    if ((i != null) && (!i.getType().equals(Material.AIR))) {
+      stack.add(i);
+    }
+  }
+  yaml.set(where, stack);
+}
+
+/*
+@EventHandler //MAKE SURE YOU HAVE THIS
+public void InventoryClick(InventoryClickEvent e){
+    Player p = (Player) e.getWhoClicked();  
+
+    if(e.getInventory().getTitle().contains("Vote Links")){
+        e.setCancelled(true); //Cancel the event so they can't take items out of the GUI
+
+        if(e.getCurrentItem() == null){
+            return;
+        }
+        if(e.getCurrentItem().getType() == Material.RECORD_3){
+        	p.sendMessage(ChatColor.AQUA + " -=-=-= Liks! =-=-=-");
+        	new FancyMessage("Planet Minecraft ")
+			.color(ChatColor.GOLD)
+			.link("http://planetminecraft.com/")
+			.send(p);
+        	p.sendMessage(ChatColor.AQUA + "-=-=-=-=-=-=-=-=-=-");
+        p.closeInventory();
+        }
+    }
+    }
+*/
+
+@EventHandler
+public void onPlayerDeath(PlayerDeathEvent e)
+{
+  if (e.getEntity().hasPermission(getConfig().getString("Permission.Graves")))
+  {
+    if (getConfig().getBoolean("Graves.Known-Player.Stats") == true)
+    {
+      if (getConfig().getBoolean("Graves.Known-Player.Killer") == true)
+      {
+        World world = e.getEntity().getWorld();
+        Calendar c = Calendar.getInstance();
+        Location loc = e.getEntity().getLocation().add(0.0D, 2.0D, -1.0D);
+        ItemStack itemStack = new ItemStack(Material.getMaterial(getConfig().getString("Graves.Known-Player.Item")));
+        final FloatingItem floatingItem = HolographicDisplaysAPI.createFloatingItem(this, loc, itemStack);
+
+        final Hologram h = HolographicDisplaysAPI.createHologram(this, 
+          e.getEntity().getLocation().add(0.0D, 5.0D, -1.0D), new String[] { 
+          ChatColor.DARK_AQUA + e.getEntity().getDisplayName(), 
+          ChatColor.DARK_AQUA + "Was Killed Here", 
+          ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-", 
+          ChatColor.DARK_AQUA + "Level: " + e.getEntity().getLevel(), 
+          ChatColor.DARK_AQUA + "Time of death: " + c.get(10) + ":" + c.get(12) + (c.get(9) == 0 ? " AM" : " PM"), 
+          ChatColor.DARK_AQUA + "Killer: " + e.getEntity().getKiller().getDisplayName(), 
+          ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-" });
+        if (getConfig().getBoolean("Physical-Grave.Enable")) {
+          e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setType(Material.getMaterial(getConfig().getString("Physical-Grave.Item")));
+          e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setTypeId(43);
+          e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+          e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+          e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                  new FixedMetadataValue(this, getName()));
+                e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setMetadata("Skull", 
+                        new FixedMetadataValue(this, getName()));
+                e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                        new FixedMetadataValue(this, getName()));
+                e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                        new FixedMetadataValue(this, getName()));
+          world.strikeLightning(e.getEntity().getLocation().add(0.0D, 7.0D, -1.0D));
+          for (Player p : Bukkit.getOnlinePlayers()) {
+            e.getEntity().playSound(e.getEntity().getLocation(), Sound.AMBIENCE_THUNDER, 1.0F, 1.0F);
+          }
+
+        }
+
+        if (getConfig().getBoolean("Graves.SaveInv") == true) {
+          saveInv(e.getEntity(), e.getDrops());
+        }
+
+        new BukkitRunnable()
+        {
+          public void run()
+          {
+            h.delete();
+            floatingItem.delete();
+          }
+        }
+        .runTaskLater(this, Long.valueOf(getConfig().getLong("Graves.Known-Player.LifeSpan")).longValue());
+      }
+      else
+      {
+        World world = e.getEntity().getWorld();
+        Calendar c = Calendar.getInstance();
+        Location loc = e.getEntity().getLocation().add(0.0D, 2.0D, -1.0D);
+        ItemStack itemStack = new ItemStack(Material.getMaterial(getConfig().getString("Graves.Known-Player.Item")));
+        final FloatingItem floatingItem = HolographicDisplaysAPI.createFloatingItem(this, loc, itemStack);
+
+        final Hologram h = HolographicDisplaysAPI.createHologram(this, 
+          e.getEntity().getLocation().add(0.0D, 5.0D, -1.0D), new String[] { 
+          ChatColor.DARK_AQUA + e.getEntity().getDisplayName(), 
+          ChatColor.DARK_AQUA + "Was Killed Here", 
+          ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-", 
+          ChatColor.DARK_AQUA + "Level: " + e.getEntity().getLevel(), 
+          ChatColor.DARK_AQUA + "Time of death: " + c.get(10) + ":" + c.get(12) + (c.get(9) == 0 ? " AM" : " PM"), 
+          ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-" });
+
+        if (getConfig().getBoolean("Physical-Grave.Enable")) {
+            e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setType(Material.getMaterial(getConfig().getString("Physical-Grave.Item")));
+            e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setTypeId(43);
+            e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+            e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+            e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                    new FixedMetadataValue(this, getName()));
+                  e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setMetadata("Skull", 
+                          new FixedMetadataValue(this, getName()));
+                  e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                          new FixedMetadataValue(this, getName()));
+                  e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                          new FixedMetadataValue(this, getName()));
+          world.strikeLightning(e.getEntity().getLocation().add(0.0D, 7.0D, -1.0D));
+          for (Player p : Bukkit.getOnlinePlayers()) {
+            e.getEntity().playSound(e.getEntity().getLocation(), Sound.AMBIENCE_THUNDER, 1.0F, 1.0F);
+          }
+
+        }
+
+        if (getConfig().getBoolean("Graves.SaveInv") == true) {
+          saveInv(e.getEntity(), e.getDrops());
+        }
+
+        new BukkitRunnable()
+        {
+          public void run()
+          {
+            h.delete();
+            floatingItem.delete();
+          }
+        }
+        .runTaskLater(this, Long.valueOf(getConfig().getLong("Graves.Known-Player.LifeSpan")).longValue());
+      }
+    }
+    else
+    {
+      World world = e.getEntity().getWorld();
+      Calendar c = Calendar.getInstance();
+      Location loc = e.getEntity().getLocation().add(0.0D, 2.0D, -1.0D);
+      ItemStack itemStack = new ItemStack(Material.getMaterial(getConfig().getString("Graves.Known-Player.Item")));
+      final FloatingItem floatingItem = HolographicDisplaysAPI.createFloatingItem(this, loc, itemStack);
+
+      final Hologram h = HolographicDisplaysAPI.createHologram(this, 
+        e.getEntity().getLocation().add(0.0D, 5.0D, -1.0D), new String[] { 
+        ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-", 
+        ChatColor.DARK_AQUA + e.getEntity().getDisplayName(), 
+        ChatColor.DARK_AQUA + "Was Killed Here", 
+        ChatColor.DARK_AQUA + "-=-=-=-=-=-=-=-=-=-=-" });
+      if (getConfig().getBoolean("Physical-Grave.Enable")) {
+          e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setType(Material.getMaterial(getConfig().getString("Physical-Grave.Item")));
+          e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setTypeId(43);
+          e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+          e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setTypeId(44);
+        e.getEntity().getLocation().add(0.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+          new FixedMetadataValue(this, getName()));
+        e.getEntity().getLocation().add(0.0D, 0.0D, 0.0D).getBlock().setMetadata("Skull", 
+                new FixedMetadataValue(this, getName()));
+        e.getEntity().getLocation().add(1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                new FixedMetadataValue(this, getName()));
+        e.getEntity().getLocation().add(-1.0D, 1.0D, 0.0D).getBlock().setMetadata("Skull", 
+                new FixedMetadataValue(this, getName()));
+        world.strikeLightning(e.getEntity().getLocation().add(0.0D, 7.0D, -1.0D));
+        for (Player p : Bukkit.getOnlinePlayers()) {
+          e.getEntity().playSound(e.getEntity().getLocation(), Sound.AMBIENCE_THUNDER, 1.0F, 1.0F);
+        }
+        
+
+      }
+
+      if (getConfig().getBoolean("Graves.SaveInv") == true) {
+        saveInv(e.getEntity(), e.getDrops());
+      }
+
+      new BukkitRunnable()
+      {
+        public void run()
+        {
+          h.delete();
+          floatingItem.delete();
+        }
+      }
+      .runTaskLater(this, Long.valueOf(getConfig().getLong("Graves.Known-Player.LifeSpan")).longValue());
+    }
+
+  }
+  else if (getConfig().getBoolean("Graves.Unknown-Player.Use"))
+  {
+    Location loc = e.getEntity().getLocation().add(0.0D, 2.0D, 0.0D);
+    ItemStack itemStack = new ItemStack(Material.getMaterial(getConfig().getString("Graves.Unknown-Player.Item")));
+    final FloatingItem floatingItem = HolographicDisplaysAPI.createFloatingItem(this, loc, itemStack);
+
+    final Hologram h = HolographicDisplaysAPI.createHologram(this, 
+      e.getEntity().getLocation().add(0.0D, 5.0D, 0.0D), new String[] { 
+      ChatColor.DARK_AQUA + "some one was killed here Dont know who though?" });
+
+    new BukkitRunnable()
+    {
+      public void run()
+      {
+        h.delete();
+        floatingItem.delete();
+      }
+    }
+    .runTaskLater(this, Long.valueOf(getConfig().getLong("Graves.Unknown-Player.LifeSpan")).longValue());
+  }
+}
+@EventHandler
+public void onClick(PlayerInteractEvent e)
+{
+  Player p = e.getPlayer();
+  if (e.getAction().equals(Action.LEFT_CLICK_AIR))
+    return;
+  if (e.getAction().equals(Action.RIGHT_CLICK_AIR))
+    return;
+  if (e.getClickedBlock().getType() == Material.getMaterial(getConfig().getString("Physical-Grave.Item")))
+  {
+    if ((e.getClickedBlock().getLocation().getBlock()
+      .hasMetadata("Skull")) && (
+      (e.getAction().equals(Action.RIGHT_CLICK_BLOCK)) || 
+      (e.getAction().equals(Action.LEFT_CLICK_BLOCK)))) {
+      e.getClickedBlock().setType(Material.AIR);
+      if (getConfig().getBoolean("Graves.SaveInv") == true) {
+        recover(p);
+        p.updateInventory();
+      }
+
+      p.setHealth(20);
+      p.setSaturation(20.0F);
+      p.setFireTicks(0);
+      p.playSound(p.getPlayer().getLocation(), Sound.LEVEL_UP, 1.0F, 1.0F);
+      p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 4, 5));
+    }
+  }
+    if (e.getClickedBlock().getTypeId() == 43)
+    {
+    if ((e.getClickedBlock().getLocation().getBlock()
+    	      .hasMetadata("Skull")) && (
+    	      (e.getAction().equals(Action.RIGHT_CLICK_BLOCK)) || 
+    	      (e.getAction().equals(Action.LEFT_CLICK_BLOCK)))) {
+    	      e.getClickedBlock().setType(Material.AIR);
+    	      p.playSound(p.getPlayer().getLocation(), Sound.CLICK, 1.0F, 1.0F);
+    }
+    }
+    if (e.getClickedBlock().getTypeId() == 44)
+    {
+    if ((e.getClickedBlock().getLocation().getBlock()
+    	      .hasMetadata("Skull")) && (
+    	      (e.getAction().equals(Action.RIGHT_CLICK_BLOCK)) || 
+    	      (e.getAction().equals(Action.LEFT_CLICK_BLOCK)))) {
+    	      e.getClickedBlock().setType(Material.AIR);
+    	      p.playSound(p.getPlayer().getLocation(), Sound.CLICK, 1.0F, 1.0F);
+    }
+    }
+    
+  }
+
+
+  
+  
+  
+  @SuppressWarnings("deprecation")
+  public void spawnHeadBlock(Location loc, String name, String face)
+  {
+   
+  Block b = loc.getBlock();
+  b.setTypeIdAndData(Material.SKULL.getId(), (byte) 1, true);
+  Skull skull = (Skull) b.getState();
+  skull.setSkullType(SkullType.PLAYER);
+  skull.setOwner(name);
+  skull.update(true);
+   
+  }
+  
+
+
+
+protected void saveInv(Player player, List<ItemStack> drops)
+{
+if ((this.saveEmpty) || 
+  (!isItemStackArrayEmpty(player.getInventory().getContents())) || 
+  (!isItemStackArrayEmpty(player.getInventory()
+  .getArmorContents()))) {
+  this.inventory.put(player, player.getInventory().getContents());
+  this.armor.put(player, player.getInventory().getArmorContents());
+  this.xp.put(player, Integer.valueOf(player.getTotalExperience()));
+  if (this.drop)
+    this.drops.put(player, drops);
+  else
+    drops.clear();
+}
+}
+
+private boolean isItemStackArrayEmpty(ItemStack[] items)
+{
+for (ItemStack item : items) {
+  if (item != null) {
+    return false;
+  }
+}
+return true;
+}
+
+private boolean recover(Player player) {
+int r = 0;
+if (this.inventory.containsKey(player)) {
+  player.getInventory().setContents(
+    copyItems((ItemStack[])this.inventory.get(player)));
+  if (this.oneRecovery) {
+    this.inventory.remove(player);
+  }
+  r++;
+}
+if (this.armor.containsKey(player)) {
+  player.getInventory().setArmorContents(
+    copyItems((ItemStack[])this.armor.get(player)));
+  if (this.oneRecovery) {
+    this.armor.remove(player);
+  }
+  r++;
+}
+if (this.xp.containsKey(player)) {
+  player.setTotalExperience(((Integer)this.xp.get(player))
+    .intValue());
+  if (this.oneRecovery) {
+    this.xp.remove(player);
+  }
+}
+if (r > 0)
+  player.sendMessage(this.success);
+else {
+  player.sendMessage(this.fail);
+}
+return r > 0;
+}
+
+private ItemStack[] copyItems(ItemStack[] original) {
+ItemStack[] result = new ItemStack[original.length];
+for (int i = 0; i < result.length; i++) {
+  if (original[i] != null) {
+    result[i] = new ItemStack(original[i]);
+  }
+}
+return result;
+}
+
+}
+
